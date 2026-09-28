@@ -444,6 +444,7 @@ export const EVENTS_POSTED = [
     {name: 'BrowserTargetChange', bus: 'global'},
     {name: 'TrackXYPairLoad', bus: 'global'},
     {name: 'TrackXYPairRemoval', bus: 'global'},
+    {name: 'TrackXYPairChange', bus: 'global'},
     {name: 'DidHideCrosshairs', bus: 'browser'},
     {name: 'DidShowCrosshairs', bus: 'browser'},
     {name: 'DragStopped', bus: 'browser'}
@@ -468,5 +469,17 @@ export const EVENT_PAYLOAD_SHAPES = [
     // the bus is page-wide while a target set is per embed. #615.
     {event: 'BrowserTargetChange', payload: '{registry, targetedBrowsers}', readsInto: ['registry', 'targetedBrowsers']},
     {event: 'TrackXYPairLoad', payload: 'the TrackPair itself', readsInto: ['track', 'track.name', 'track.config.format']},
-    {event: 'TrackXYPairRemoval', payload: 'the TrackPair itself', readsInto: ['track', 'track.name', 'track.config.format']}
+    {event: 'TrackXYPairRemoval', payload: 'the TrackPair itself', readsInto: ['track', 'track.name', 'track.config.format']},
+    // One event for every mutation of a track pair's appearance, so a host
+    // mirroring one need not patch the setters. `property` names which
+    // setter ran and `value` is its new value: a colour string or undefined,
+    // a `{min, max}` range, a name, or a boolean. Posted by the setters on
+    // `TrackPair`, which the gear menu, colour picker and data-range dialog
+    // all go through. Checked by `test/testTrackXYPairChange.js`.
+    {
+        event: 'TrackXYPairChange',
+        payload: '{trackPair, property, value}',
+        readsInto: ['trackPair', 'property', 'value'],
+        values: {property: ['color', 'dataRange', 'name', 'autoscale', 'logScale']}
+    }
 ]
