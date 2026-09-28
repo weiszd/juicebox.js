@@ -328,12 +328,17 @@ export const SUB_SURFACES = [
  * list and throws. That is the only self-describing, self-enforcing piece of
  * the browser contract, and it is the pattern this whole module generalises.
  *
- * The last four are the view settings a host mirroring one panel onto another
- * has to follow, and which used to reach only the widgets: a host had to patch
- * the coordinator's own methods to hear them. Each fires from the same
- * coordinator method the widget is told through, so the two cannot disagree.
+ * The last four -- the colour scale, canonical `normalization`, a substitution
+ * of it, and the display mode -- are what a host mirroring one panel onto
+ * another has to follow, and none of them crosses a sync group (ADR-0014), so
+ * the host is the only route. They used to reach only the widgets: a host had
+ * to patch the coordinator's own methods to hear them. Each fires from the
+ * same coordinator method the widget is told through, so the two cannot
+ * disagree; two of those methods predate the `on*Change` naming
+ * (`onColorScale`, `onDisplayMode`) and keep their names, per ADR-0002.
  * `onNormalizationSubstituted` carries the request as well as the answer,
- * because a peer must mirror what is *drawn* (ADR-0012), not what was asked.
+ * because a peer must mirror what is *drawn* (ADR-0012, whose explicit no on
+ * publishing it is reversed by this addition), not what was asked.
  */
 export const COORDINATOR_CALLBACKS = [
     'onMapLoaded',
