@@ -413,6 +413,16 @@ export const COORDINATOR_PAYLOAD_SHAPES = [
         callback: 'onControlMapLoaded',
         payload: ['controlDataset', 'browser']
     },
+    // `dragging` is true for each step of a drag that pans the view and false
+    // for every other move -- a jump, a zoom, a restore, a sync. No locus change
+    // marks the drag's end. `DragStopped` on the browser's bus is posted when
+    // the gesture ends, which can be before its last pan has settled, so the
+    // last `dragging: true` may arrive after it.
+    {
+        callback: 'onLocusChange',
+        payload: ['state', 'changes', 'dragging', 'browser'],
+        readsInto: ['changes.resolutionChanged', 'changes.chrChanged']
+    },
     // `type` is which component the edit touched, in the spelling
     // `SignedColorScale.setColorComponents` already takes: `'+'` for the
     // positive scale -- the only one a single-sided scale has -- and `'-'` for

@@ -1,4 +1,5 @@
 import {describe, it, expect, beforeEach, afterEach} from 'vitest'
+import igv from 'igv'
 import EventBus from '../js/eventBus.js'
 import TrackPair from '../js/trackPair.js'
 import MenuUtils from '../js/trackMenuUtils.js'
@@ -129,6 +130,21 @@ describe('TrackXYPairChange', () => {
             item(MenuUtils.numericDataMenuItems(trackPair), 'Autoscale').click()
             expect(trackPair.track.autoscale).toBe(false)
             expectOneChange(trackPair, 'autoscale', false)
+        })
+
+        it('rename posts the trimmed name once, through igv\'s name setter', () => {
+            // A real igv track, so the setter is igv's own: the menu assigns
+            // `track.name`, and the one event comes from the callback into
+            // `setTrackLabelName`. Calling that as well would post twice.
+            const track = new igv.TrackBase({name: 'old'}, {})
+            const browser = {state: undefined, inputDialog: {present: ({callback}) => callback(' CTCF ')}}
+            const trackPair = new TrackPair(browser, track)
+            trackPair.x = {labelElement: {}}
+            track.trackView = trackPair
+            item(MenuUtils.trackMenuItemList(trackPair), 'Set track name').click({})
+            expect(track.name).toBe('CTCF')
+            expect(trackPair.x.labelElement.textContent).toBe('CTCF')
+            expectOneChange(trackPair, 'name', 'CTCF')
         })
 
         it('unset colour posts an undefined colour', () => {

@@ -1,5 +1,6 @@
 import {describe, it, expect, vi} from 'vitest'
 import BrowserCoordinator from '../js/browserCoordinator.js'
+import InteractionHandler from '../js/interactionHandler.js'
 import {COORDINATOR_PAYLOAD_SHAPES} from '../js/publicApi.js'
 import {withBrowser} from './utils/browserFixture.js'
 
@@ -8,7 +9,9 @@ import {withBrowser} from './utils/browserFixture.js'
  * used to stop at the widgets: colour scale, normalization, substitution and
  * display mode. Each already reached its widget through a coordinator method;
  * what was missing was the fan-out to `addCallback` subscribers, so a host
- * mirroring a panel had to monkey-patch the methods to hear about them.
+ * mirroring a panel had to monkey-patch the methods to hear about them. Also
+ * `onLocusChange`'s `dragging`, which the interaction handler knew and the
+ * payload dropped.
  *
  * Every payload is asserted against `COORDINATOR_PAYLOAD_SHAPES`, so the
  * manifest and the delivery cannot drift apart -- the #471 lesson. The widgets
@@ -40,6 +43,7 @@ function fakeCoordinator() {
         controlMapWidget: {updateDisplayMode: vi.fn()},
         normalizationWidget: {
             clearSubstitution: vi.fn(),
+            clearSubstitutionIfStale: vi.fn(),
             setNormalizationProgrammatically: vi.fn(),
             announceSubstitution: vi.fn()
         }
@@ -125,6 +129,47 @@ describe('coordinator callbacks a host can subscribe to', () => {
         expect(received[0].type).toBe('-')
         expect(shapeOf('onForegroundColorChange').values.type).toContain(received[0].type)
         expect(received[0].browser).toBe(browser)
+    })
+
+    it('delivers onLocusChange with dragging true while a drag pans and false for a discrete move', async () => {
+        // A host that cannot tell a drag from a jump has to debounce every
+        // locus change. The interaction handler already knows which it is.
+        const {browser, coordinator} = fakeCoordinator()
+        Object.assign(browser, {coordinator, dataset: {}, update: async () => {}})
+        browser.state.panShift = async () => {}
+        browser.state.updateWithLoci = async () => ({chrChanged: false, resolutionChanged: false})
+        browser.contactMatrixView.getViewDimensions = () => ({width: 100, height: 100})
+        browser.contactMatrixView.clearImageCaches = () => {}
+        const interactions = new InteractionHandler(browser)
+        const received = subscribe(coordinator, 'onLocusChange')
+
+        await interactions.shiftPixels(-10, -4)
+        await interactions.shiftPixels(-5, -6)
+        await interactions.goto(1, 0, 100, 1, 0, 100)
+
+        expect(received.map(payload => payload.dragging)).toEqual([true, true, false])
+        for (const payload of received) {
+            expectDeclaredFields('onLocusChange', payload)
+            expect(payload.browser).toBe(browser)
+        }
+    })
+
+    it('delivers onLocusChange with dragging false from a caller that does not say', () => {
+        // Restore and sync pass no flag; the fields a subscriber already reads
+        // are what they were.
+        const {browser, coordinator} = fakeCoordinator()
+        const received = subscribe(coordinator, 'onLocusChange')
+
+        coordinator.onLocusChange({state: browser.state, resolutionChanged: true, chrChanged: false})
+
+        expect(received).toHaveLength(1)
+        expectDeclaredFields('onLocusChange', received[0])
+        expect(received[0]).toEqual({
+            state: browser.state,
+            changes: {resolutionChanged: true, chrChanged: false},
+            dragging: false,
+            browser
+        })
     })
 })
 

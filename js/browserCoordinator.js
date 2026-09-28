@@ -200,10 +200,10 @@ class BrowserCoordinator {
      * @param {State} eventData.state - The new state
      * @param {boolean} eventData.resolutionChanged - Whether resolution changed
      * @param {boolean} eventData.chrChanged - Whether chromosome changed
-     * @param {boolean} eventData.dragging - Whether currently dragging
+     * @param {boolean} [eventData.dragging] - Whether a drag is panning the view; absent means false
      */
     onLocusChange(eventData) {
-        const { state, resolutionChanged, chrChanged } = eventData;
+        const { state, resolutionChanged, chrChanged, dragging } = eventData;
 
         // 0. Retire a normalization substitution announcement that this view has
         //    moved off. Asked of the view rather than of the change flags: the
@@ -248,7 +248,7 @@ class BrowserCoordinator {
 
         // 5. Notify external callbacks
         for (const callback of this.externalCallbacks.onLocusChange) {
-            callback({ state, changes: { resolutionChanged, chrChanged }, browser: this.browser });
+            callback({ state, changes: { resolutionChanged, chrChanged }, dragging: true === dragging, browser: this.browser });
         }
     }
 
