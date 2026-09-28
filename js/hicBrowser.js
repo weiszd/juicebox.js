@@ -575,6 +575,11 @@ class HICBrowser {
 
     setColorScaleThreshold(threshold) {
         this.contactMatrixView.setColorScaleThreshold(threshold)
+        // The threshold is on the scale before the view's repaint is awaited,
+        // so what is announced is what will be drawn. The auto-threshold path
+        // announces itself from the tile source; this one is the user's edit,
+        // and used to say nothing.
+        this.coordinator.onColorScale(this.contactMatrixView.getColorScale())
     }
 
     updateCrosshairs({ x, y, xNormalized, yNormalized }) {
@@ -1378,7 +1383,7 @@ class HICBrowser {
             ? substitutionReason.notInBothMaps(requested, resolved)
             : substitutionReason.notInFile(requested, resolved);
 
-        this.coordinator.onNormalizationSubstituted(resolved, reason);
+        this.coordinator.onNormalizationSubstituted({requested, effective: resolved, reason});
     }
 
     /**
@@ -1502,10 +1507,11 @@ class HICBrowser {
         }
 
         this.#state.normalization = effective;
-        this.coordinator.onNormalizationSubstituted(
+        this.coordinator.onNormalizationSubstituted({
+            requested,
             effective,
-            substitutionReason.notAtThisView(requested, effective)
-        );
+            reason: substitutionReason.notAtThisView(requested, effective)
+        });
     }
 
     async shiftPixels(dx, dy) {

@@ -319,14 +319,21 @@ export const SUB_SURFACES = [
  * locus changes and colour changes without subscribing to the event bus. See
  * ADR-0002 for why the coordinator is not going away.
  *
- * All six are declared, not just the three a known consumer happens to use
- * today: `addCallback` throws on an unrecognised name, so the set it accepts is
+ * All are declared, not just the ones a known consumer happens to use today:
+ * `addCallback` throws on an unrecognised name, so the set it accepts is
  * already published behaviour. Narrowing it would break a host that registered
- * one of the other three, silently and only at runtime.
+ * one of the others, silently and only at runtime.
  *
  * The coordinator got here on its own -- it validates against its own declared
  * list and throws. That is the only self-describing, self-enforcing piece of
  * the browser contract, and it is the pattern this whole module generalises.
+ *
+ * The last four are the view settings a host mirroring one panel onto another
+ * has to follow, and which used to reach only the widgets: a host had to patch
+ * the coordinator's own methods to hear them. Each fires from the same
+ * coordinator method the widget is told through, so the two cannot disagree.
+ * `onNormalizationSubstituted` carries the request as well as the answer,
+ * because a peer must mirror what is *drawn* (ADR-0012), not what was asked.
  */
 export const COORDINATOR_CALLBACKS = [
     'onMapLoaded',
@@ -335,7 +342,11 @@ export const COORDINATOR_CALLBACKS = [
     'onGenomeChange',
     'onBackgroundColorChange',
     'onForegroundColorChange',
-    'onSyncRefused'
+    'onSyncRefused',
+    'onColorScaleChange',
+    'onNormalizationChange',
+    'onNormalizationSubstituted',
+    'onDisplayModeChange'
 ]
 
 /**
@@ -367,6 +378,37 @@ export const COORDINATOR_PAYLOAD_SHAPES = [
     {
         callback: 'onControlMapLoaded',
         payload: ['controlDataset', 'browser']
+    },
+    // `type` is which component the edit touched, in the spelling
+    // `SignedColorScale.setColorComponents` already takes: `'+'` for the
+    // positive scale -- the only one a single-sided scale has -- and `'-'` for
+    // the negative. Additive: `rgb` and `browser` are what they always were.
+    {
+        callback: 'onForegroundColorChange',
+        payload: ['rgb', 'type', 'browser'],
+        values: {type: ['+', '-']}
+    },
+    // Fires from the auto-threshold path and from `setColorScaleThreshold`,
+    // so a user's threshold edit is heard the same way a computed one is.
+    {
+        callback: 'onColorScaleChange',
+        payload: ['colorScale', 'browser']
+    },
+    {
+        callback: 'onNormalizationChange',
+        payload: ['normalization', 'browser']
+    },
+    // Both substitution moments of ADR-0012, restore-time and mid-render.
+    // `effective` is what canonical state now names; `reason` is the sentence
+    // the widget shows.
+    {
+        callback: 'onNormalizationSubstituted',
+        payload: ['requested', 'effective', 'reason', 'browser']
+    },
+    {
+        callback: 'onDisplayModeChange',
+        payload: ['mode', 'browser'],
+        values: {mode: ['A', 'B', 'AOB', 'BOA', 'AMB']}
     }
 ]
 
