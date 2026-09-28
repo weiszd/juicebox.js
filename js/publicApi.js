@@ -166,6 +166,15 @@ export const BROWSER_SURFACE = [
     'getSyncState',
     'syncState',
 
+    // What a track pair's setters and `layoutController.removeTrackXYPair` do
+    // for a 1D track, done here for a 2D one: take it off the panel, recolour
+    // it, rename it. Each posts a global event -- `Track2DRemoval` or
+    // `Track2DChange` -- and the annotation panel goes through the same
+    // members, so a host hears a user's edit the way it hears its own.
+    'removeTrack2D',
+    'setTrack2DColor',
+    'setTrack2DName',
+
     // Constructor-assigned fields
     'id',
     'config',
@@ -465,6 +474,9 @@ export const EVENTS_POSTED = [
     {name: 'TrackXYPairLoad', bus: 'global'},
     {name: 'TrackXYPairRemoval', bus: 'global'},
     {name: 'TrackXYPairChange', bus: 'global'},
+    {name: 'Track2DLoad', bus: 'global'},
+    {name: 'Track2DRemoval', bus: 'global'},
+    {name: 'Track2DChange', bus: 'global'},
     {name: 'DidHideCrosshairs', bus: 'browser'},
     {name: 'DidShowCrosshairs', bus: 'browser'},
     {name: 'DragStopped', bus: 'browser'}
@@ -501,5 +513,21 @@ export const EVENT_PAYLOAD_SHAPES = [
         payload: '{trackPair, property, value}',
         readsInto: ['trackPair', 'property', 'value'],
         values: {property: ['color', 'dataRange', 'name', 'autoscale', 'logScale']}
+    },
+    // The 2D-track counterparts of the three above. Load and removal carry the
+    // `Track2D` itself, as the track-pair ones carry the pair; a genome change
+    // posts one `Track2DRemoval` per 2D track, as it does `TrackXYPairRemoval`
+    // per pair. `Track2DChange` is posted by `setTrack2DColor` (`value` a
+    // colour string, or undefined for the features' own) and `setTrack2DName`.
+    // Its subject is keyed `track2D` as `TrackXYPairChange`'s is keyed
+    // `trackPair`: the key names the kind of track.
+    // Checked by `test/testTrack2DSurface.js`.
+    {event: 'Track2DLoad', payload: 'the Track2D itself', readsInto: ['name', 'color', 'config.url']},
+    {event: 'Track2DRemoval', payload: 'the Track2D itself', readsInto: ['name', 'color', 'config.url']},
+    {
+        event: 'Track2DChange',
+        payload: '{track2D, property, value}',
+        readsInto: ['track2D', 'property', 'value'],
+        values: {property: ['color', 'name']}
     }
 ]

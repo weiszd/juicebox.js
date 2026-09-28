@@ -58,6 +58,15 @@ needed is added as an observation or a declaration any host could use:
   `setNormalization`, `setDisplayMode`, `getDisplayMode`, `getColorScale`,
   `getSyncState`, `syncState`. All existed; declaring them makes the finding
   whole and gives the eight methods the post-dispose guard of ADR-0005.
+- The same for a 2D track. Three new browser members, `removeTrack2D`,
+  `setTrack2DColor` and `setTrack2DName`, which the annotation panel's delete
+  and colour swatches now go through, and three global events:
+  `Track2DLoad` and `Track2DRemoval`, carrying the `Track2D` as the
+  track-pair ones carry the pair, and `Track2DChange {track2D, property,
+  value}`. A separate event rather than a widened `TrackXYPairChange`, whose
+  `trackPair` key a subscriber reads as a track pair. Before them a host could
+  only splice `tracks2D` and repaint through undeclared members, and heard
+  nothing.
 - `parseGotoInput` accepts the looser spellings a person types: a space for
   the colon, `kb`/`mb` suffixes, the word `chromosome` before a name, and a
   `{chr, start, end}` object. Locus *parsing* belongs in the viewer.
