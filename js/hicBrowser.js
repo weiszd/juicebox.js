@@ -129,6 +129,20 @@ function pendingTrackLook({config, track}) {
     }
 }
 
+/**
+ * Refuse a published call on a disposed browser. Decision 6 of ADR-0005.
+ *
+ * A function over the `isDisposed` getter rather than a private method, so a
+ * prototype method borrowed onto a stub -- `test/testSyncOptOut.js` takes
+ * `syncState` that way -- is not brand-checked on a receiver that has no flag
+ * and nothing to have disposed.
+ */
+function assertNotDisposed(browser, methodName) {
+    if (browser.isDisposed) {
+        throw new DisposedBrowserError(browser.id, methodName);
+    }
+}
+
 class HICBrowser {
 
     /**
@@ -492,11 +506,13 @@ class HICBrowser {
     }
 
     async setDisplayMode(mode) {
+        assertNotDisposed(this, 'setDisplayMode');
         await this.contactMatrixView.setDisplayMode(mode)
         this.coordinator.onDisplayMode(mode)
     }
 
     getDisplayMode() {
+        assertNotDisposed(this, 'getDisplayMode');
         return this.contactMatrixView ? this.contactMatrixView.displayMode : undefined
     }
 
@@ -570,10 +586,12 @@ class HICBrowser {
     }
 
     getColorScale() {
+        assertNotDisposed(this, 'getColorScale');
         return this.contactMatrixView?.getColorScale()
     }
 
     setColorScaleThreshold(threshold) {
+        assertNotDisposed(this, 'setColorScaleThreshold');
         this.contactMatrixView.setColorScaleThreshold(threshold)
     }
 
@@ -617,7 +635,7 @@ class HICBrowser {
     }
 
     setCustomCrosshairsHandler(crosshairsHandler) {
-        this.#assertNotDisposed('setCustomCrosshairsHandler')
+        assertNotDisposed(this, 'setCustomCrosshairsHandler')
         this.customCrosshairsHandler = crosshairsHandler
     }
 
@@ -678,7 +696,7 @@ class HICBrowser {
      * @param configs
      */
     async loadTracks(configs) {
-        this.#assertNotDisposed('loadTracks');
+        assertNotDisposed(this, 'loadTracks');
         return this.dataLoader.loadTracks(normalizeTrackConfigs(configs));
     }
 
@@ -692,7 +710,7 @@ class HICBrowser {
      * normalization, same loader body; only the reporting differs. #615.
      */
     async loadTracksOrThrow(configs) {
-        this.#assertNotDisposed('loadTracksOrThrow');
+        assertNotDisposed(this, 'loadTracksOrThrow');
         return this.dataLoader.loadTracksOrThrow(normalizeTrackConfigs(configs));
     }
 
@@ -815,15 +833,6 @@ class HICBrowser {
     }
 
     /**
-     * Refuse a published call on a disposed browser. Decision 6 of ADR-0005.
-     */
-    #assertNotDisposed(methodName) {
-        if (this.#disposed) {
-            throw new DisposedBrowserError(this.id, methodName);
-        }
-    }
-
-    /**
      * Put this browser back to how it was constructed, without becoming a
      * different browser.
      *
@@ -853,7 +862,7 @@ class HICBrowser {
      */
     reset() {
 
-        this.#assertNotDisposed('reset')
+        assertNotDisposed(this, 'reset')
 
         const {config, id, registry} = this
         const appContainer = this.rootElement.parentElement
@@ -970,7 +979,7 @@ class HICBrowser {
      * @param noUpdates
      */
     async loadHicFile(config, noUpdates) {
-        this.#assertNotDisposed('loadHicFile');
+        assertNotDisposed(this, 'loadHicFile');
         return this.dataLoader.loadHicFile(config, noUpdates);
     }
 
@@ -983,7 +992,7 @@ class HICBrowser {
      * loader body; only the reporting differs. #679.
      */
     async loadHicFileOrThrow(config, noUpdates) {
-        this.#assertNotDisposed('loadHicFileOrThrow');
+        assertNotDisposed(this, 'loadHicFileOrThrow');
         return this.dataLoader.loadHicFileOrThrow(config, noUpdates);
     }
 
@@ -997,7 +1006,7 @@ class HICBrowser {
      * @returns {Promise<HiCDataset>}
      */
     async loadLiveContactMap(config, noUpdates) {
-        this.#assertNotDisposed('loadLiveContactMap');
+        assertNotDisposed(this, 'loadLiveContactMap');
         return this.dataLoader.loadLiveContactMap(config, noUpdates);
     }
 
@@ -1010,7 +1019,7 @@ class HICBrowser {
      * @param config
      */
     async loadHicControlFile(config, noUpdates) {
-        this.#assertNotDisposed('loadHicControlFile');
+        assertNotDisposed(this, 'loadHicControlFile');
         return this.dataLoader.loadHicControlFile(config, noUpdates);
     }
 
@@ -1024,12 +1033,12 @@ class HICBrowser {
      * unreported. #679.
      */
     async loadHicControlFileOrThrow(config, noUpdates) {
-        this.#assertNotDisposed('loadHicControlFileOrThrow');
+        assertNotDisposed(this, 'loadHicControlFileOrThrow');
         return this.dataLoader.loadHicControlFileOrThrow(config, noUpdates);
     }
 
     async parseGotoInput(input) {
-        this.#assertNotDisposed('parseGotoInput');
+        assertNotDisposed(this, 'parseGotoInput');
         return this.interactions.parseGotoInput(input);
     }
 
@@ -1104,6 +1113,7 @@ class HICBrowser {
      * @returns {Promise<void>}
      */
     async zoomAndCenter(direction, centerPX, centerPY) {
+        assertNotDisposed(this, 'zoomAndCenter');
         return this.interactions.zoomAndCenter(direction, centerPX, centerPY);
     }
 
@@ -1390,6 +1400,7 @@ class HICBrowser {
      * browser rather than about the view.
      */
     getSyncState() {
+        assertNotDisposed(this, 'getSyncState');
         if (!this.dataset || !this.state) {
             return undefined;
         }
@@ -1414,6 +1425,7 @@ class HICBrowser {
      * on it (#605). An assert since #632 -- see the comment there.
      */
     async syncState(targetState) {
+        assertNotDisposed(this, 'syncState');
         if (!targetState || !isSynchable(this) || !this.state) {
             return;
         }
@@ -1463,6 +1475,7 @@ class HICBrowser {
     }
 
     setNormalization(normalization) {
+        assertNotDisposed(this, 'setNormalization');
         if (this.#state) {
             this.#state.normalization = normalization;
         }
