@@ -71,6 +71,10 @@ export const NAMESPACE_SURFACE = [
     'restoreSession',
     'compressedSession',
     'createBrowser',
+    // Removes a browser from its registry -- what the built-in navbar minus
+    // button does. A host that made its panels through createBrowser has no
+    // other way to take one down.
+    'deleteBrowser',
     'getCurrentBrowser',
     'setCurrentBrowser',
     'getAllBrowsers',
