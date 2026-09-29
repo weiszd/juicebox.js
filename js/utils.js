@@ -43,12 +43,37 @@ function extractName(config) {
             return urlOrFile.name
         } else {
             const str = urlOrFile.split('?').shift()
-            const idx = urlOrFile.lastIndexOf("/")
-            return idx > 0 ? str.substring(idx + 1) : str
+            const idx = str.lastIndexOf("/")
+            const segment = idx > 0 ? str.substring(idx + 1) : str
+            try {
+                return decodeURIComponent(segment)
+            } catch {
+                // A stray '%' is not an escape; show the segment as written
+                return segment
+            }
         }
     } else {
         return config.name
     }
+}
+
+/**
+ * The name juicebox gives a track the host did not name: its file's name, as
+ * `extractName` gives a map's. `undefined` when the host named it -- by `name`
+ * or by `label`, igv reads either -- and for a `data:` URL, which has no file
+ * name and which igv leaves unnamed. The one test of whether a track is
+ * unnamed. #695.
+ */
+function derivedTrackName(config) {
+    if (config.name || config.label || String(config.url).startsWith('data:')) {
+        return undefined
+    }
+    return extractName({url: config.url})
+}
+
+/** The name a track shows: the host's, else the one juicebox derives. #695. */
+function trackName(config) {
+    return config.name || config.label || derivedTrackName(config)
 }
 
 /**
@@ -124,4 +149,4 @@ function errorMessage(error) {
     return Object.hasOwn(httpMessages, error.code) ? httpMessages[error.code] : error.message;
 }
 
-export { createDOMFromHTMLString, getOffset, parseRgbString, prettyPrint, extractName, presentError, errorMessage, isBotChallenge, hitTestBbox }
+export { createDOMFromHTMLString, getOffset, parseRgbString, prettyPrint, extractName, derivedTrackName, trackName, presentError, errorMessage, isBotChallenge, hitTestBbox }
