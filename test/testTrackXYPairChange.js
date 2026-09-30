@@ -23,10 +23,15 @@ const DECLARED_PROPERTIES = EVENT_PAYLOAD_SHAPES.find(entry => 'TrackXYPairChang
  * A pair with no browser state behind it, so a repaint stands down at its
  * guard and the setter's only observable effect is the event and the field.
  */
+const renderer = () => {
+    const labelElement = {}
+    return {labelElement, setLabelText(text) { labelElement.textContent = text; labelElement.title = text }}
+}
+
 function pair(track = {}) {
     const trackPair = new TrackPair({state: undefined}, {dataRange: {min: 0, max: 1}, ...track})
-    trackPair.x = {labelElement: {}}
-    trackPair.y = {}
+    trackPair.x = renderer()
+    trackPair.y = renderer()
     return trackPair
 }
 
@@ -89,7 +94,8 @@ describe('TrackXYPairChange', () => {
         }
         // Built by hand: the fixture spreads its track, which flattens an accessor.
         const trackPair = new TrackPair({state: undefined}, track)
-        trackPair.x = {labelElement: {}}
+        trackPair.x = renderer()
+        trackPair.y = renderer()
         track.trackView = trackPair
         track.name = 'CTCF'
         expect(trackPair.track.name).toBe('CTCF')
@@ -139,7 +145,8 @@ describe('TrackXYPairChange', () => {
             const track = new igv.TrackBase({name: 'old'}, {})
             const browser = {state: undefined, inputDialog: {present: ({callback}) => callback(' CTCF ')}}
             const trackPair = new TrackPair(browser, track)
-            trackPair.x = {labelElement: {}}
+            trackPair.x = renderer()
+            trackPair.y = renderer()
             track.trackView = trackPair
             item(MenuUtils.trackMenuItemList(trackPair), 'Set track name').click({})
             expect(track.name).toBe('CTCF')
