@@ -488,6 +488,8 @@ export const COORDINATOR_PAYLOAD_SHAPES = [
 export const EVENTS_POSTED = [
     {name: 'GenomeChange', bus: 'global'},
     {name: 'BrowserSelect', bus: 'global'},
+    {name: 'BrowserAdd', bus: 'global'},
+    {name: 'BrowserDelete', bus: 'global'},
     {name: 'BrowserTargetChange', bus: 'global'},
     {name: 'TrackXYPairLoad', bus: 'global'},
     {name: 'TrackXYPairRemoval', bus: 'global'},
@@ -513,6 +515,13 @@ export const EVENTS_POSTED = [
  * Declaration only; verifying it means posting a real track load.
  */
 export const EVENT_PAYLOAD_SHAPES = [
+    // The one browser, as `BrowserSelect` carries it. `BrowserAdd` is posted
+    // once the browser is in `registry.browsers` and `BrowserDelete` while it
+    // still is, so `registry.browsers.indexOf(browser)` is its position in
+    // both. Neither is posted by a restore or a reset. Checked by
+    // `test/testBrowserAddDeleteEvents.js`.
+    {event: 'BrowserAdd', payload: 'the HICBrowser itself', readsInto: ['registry', 'id']},
+    {event: 'BrowserDelete', payload: 'the HICBrowser itself', readsInto: ['registry', 'id']},
     // Plural name because the subject is a set, unlike `BrowserSelect`, whose
     // payload is the one browser. It carries the *resolved* array so a host
     // need not re-derive the implicit-current rule, and the registry because

@@ -121,6 +121,12 @@ class BrowserRegistry {
         // loads before it hands over -- changes the open maps, and the load's
         // own recompute ran while this one was not yet in the list. #635.
         this.sync()
+        // Posted once the browser is in the list, so a host can read its
+        // position; not posted by the session path, which registers without
+        // adding -- a restore is not the user opening a panel. A host that
+        // mirrors this embed on another page (juicebox-mcp's remote) opens a
+        // panel there on this event and closes one on `BrowserDelete`.
+        EventBus.globalBus.post(HICEvent("BrowserAdd", browser))
         this.select(browser)
         this.refreshDeleteButtonVisibility()
     }
@@ -483,6 +489,11 @@ class BrowserRegistry {
      * `rootElement` now cannot.
      */
     delete(browser) {
+        // Posted while the browser is still in the list, so a host can read
+        // the position it is leaving. `deleteAll` (a restore) and `reset()`
+        // release their slots without passing here, so neither looks like the
+        // user closing a panel.
+        EventBus.globalBus.post(HICEvent("BrowserDelete", browser))
         browser.dispose()
     }
 
