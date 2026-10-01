@@ -411,6 +411,21 @@ class ContactMatrixView {
 
         const recognizer = this.gestureRecognizer;
 
+        // The position the crosshairs follow: page-minus-offset.
+        const pointerIn = (e) => {
+            const { top, left } = getOffset(viewportElement)
+            const rect = viewportElement.getBoundingClientRect();
+
+            const pointer =
+                {
+                    x: e.pageX - left,
+                    y: e.pageY - top
+                };
+            pointer.xNormalized = pointer.x / rect.width;
+            pointer.yNormalized = pointer.y / rect.height;
+            return pointer;
+        };
+
         viewportElement.addEventListener('mousedown', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -433,16 +448,8 @@ class ContactMatrixView {
             e.preventDefault();
             e.stopPropagation();
 
-            const { top, left } = getOffset(viewportElement)
             const rect = viewportElement.getBoundingClientRect();
-
-            const pointer =
-                {
-                    x: e.pageX - left,
-                    y: e.pageY - top
-                };
-            pointer.xNormalized = pointer.x / rect.width;
-            pointer.yNormalized = pointer.y / rect.height;
+            const pointer = pointerIn(e);
 
             this.browser.coordinator.onUpdateContactMapMousePosition(pointer);
 
@@ -469,7 +476,7 @@ class ContactMatrixView {
             this.carryOut(recognizer.wheel({ x: e.offsetX, y: e.offsetY, deltaY: e.deltaY }));
         })
 
-        viewportElement.addEventListener('mouseover', () => this.carryOut(recognizer.mouseOver()))
+        viewportElement.addEventListener('mouseover', (e) => this.carryOut(recognizer.mouseOver({ shiftKey: e.shiftKey, pointer: pointerIn(e) })))
         viewportElement.addEventListener('mouseout', () => this.carryOut(recognizer.mouseOut()))
 
         viewportElement.addEventListener('mouseleave', () => {
@@ -527,6 +534,7 @@ class ContactMatrixView {
      * Carry out the intents the gesture recognizer named, in order. Each goes
      * where it went before the recognizer existed: through the browser's
      * forwarding methods, the interaction handler, the sweep zoom, or the bus.
+     * The host hears of the crosshairs from the browser, not from here.
      */
     carryOut(intents) {
         for (const intent of intents) {
@@ -562,15 +570,14 @@ class ContactMatrixView {
                     this.sweepZoom.commit(intent.rect).catch(err => console.error('Error in sweepZoom.commit:', err));
                     break;
                 case 'showCrosshairs':
-                    this.browser.eventBus.post(HICEvent('DidShowCrosshairs', 'DidShowCrosshairs'));
+                    // Nothing to carry out: there is no position until the
+                    // first move, and that move is what shows them.
                     break;
                 case 'moveCrosshairs':
-                    this.browser.updateCrosshairs(intent.pointer);
-                    this.browser.showCrosshairs();
+                    this.browser.moveCrosshairs(intent.pointer);
                     break;
                 case 'hideCrosshairs':
-                    this.browser.hideCrosshairs();
-                    this.browser.eventBus.post(HICEvent('DidHideCrosshairs', 'DidHideCrosshairs'));
+                    this.browser.releaseCrosshairs();
                     break;
                 default:
                     throw new Error(`ContactMatrixView: unknown gesture intent '${intent.type}'`);

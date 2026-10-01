@@ -1,5 +1,6 @@
 import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest'
 import {withBrowser} from './utils/browserFixture.js'
+import Genome from '../js/genome.js'
 
 /**
  * Characterization of the viewport's gestures, as they are today -- quirks
@@ -75,9 +76,11 @@ function standInMap(browser) {
         writable: true,
     })
     browser.dataset = {
-        chromosomes: [{index: 0, name: 'All'}, {index: 1, name: 'chr1'}, {index: 2, name: 'chr2'}],
+        chromosomes: [{index: 0, name: 'All'}, {index: 1, name: 'chr1', size: 1000000}, {index: 2, name: 'chr2', size: 1000000}],
         binSizeForZoom: () => 1000,
+        isWholeGenome: index => 0 === index,
     }
+    browser.genome = new Genome('stand-in', browser.dataset.chromosomes)
     vi.spyOn(browser.contactMatrixView, 'getViewDimensions').mockReturnValue({width: 800, height: 600})
     // The mouse-move handler measures the rect rather than asking the view.
     vi.spyOn(browser.contactMatrixView.viewportElement, 'getBoundingClientRect')
@@ -231,9 +234,11 @@ describe('viewport gestures', () => {
      * crosshairs included. Pinned as it is: #655.
      */
     /**
-     * Both crosshair paths Spacewalk depends on: the `DidShowCrosshairs` /
+     * Both crosshair paths Spacewalk has depended on: the `DidShowCrosshairs` /
      * `DidHideCrosshairs` pair on the bus, and the handler a host registers
      * with `setCustomCrosshairsHandler` (Spacewalk's `juiceboxPanel.js`).
+     * Deprecated since #709, and shims over `onCrosshairsMove` and
+     * `onCrosshairsHide` -- see `testCrosshairsHostCallbacks.js`.
      */
     describe('crosshairs and mouse position, mobile flag off', () => {
 
@@ -250,11 +255,19 @@ describe('viewport gestures', () => {
             expect(reported.mock.calls).toEqual([[{x: 40, y: 60, xNormalized: 0.05, yNormalized: 0.1}]])
         })
 
-        it('posts DidShowCrosshairs when shift goes down over the viewport', () => {
+        /**
+         * Shift alone gives no position, so nothing is shown until the pointer
+         * moves; the first move is the show. #709.
+         */
+        it('posts DidShowCrosshairs on the first mouse-move after shift goes down over the viewport, once', () => {
             const posted = watchPosts(browser, ['DidShowCrosshairs'])
 
             mouse(viewport, 'mouseover')
             key('keydown', {key: 'Shift', shiftKey: true})
+            expect(posted).toEqual([])
+
+            mouse(viewport, 'mousemove', {x: 40, y: 60})
+            mouse(viewport, 'mousemove', {x: 50, y: 60})
 
             expect(posted).toEqual(['DidShowCrosshairs'])
         })
@@ -265,6 +278,7 @@ describe('viewport gestures', () => {
             mouse(viewport, 'mouseover')
             mouse(viewport, 'mouseout')
             key('keydown', {key: 'Shift', shiftKey: true})
+            mouse(viewport, 'mousemove', {x: 40, y: 60})
 
             expect(posted).toEqual([])
         })
@@ -298,24 +312,99 @@ describe('viewport gestures', () => {
 
             mouse(viewport, 'mouseover')
             key('keydown', {key: 'Shift', shiftKey: true})
+            mouse(viewport, 'mousemove', {x: 40, y: 60})
             key('keyup', {key: 'Shift'})
             mouse(viewport, 'mousemove', {x: 40, y: 30})
 
             expect(posted).toEqual(['DidShowCrosshairs', 'DidHideCrosshairs'])
-            expect(handler).not.toHaveBeenCalled()
+            expect(handler).toHaveBeenCalledTimes(1)
         })
 
         /**
-         * Not a bug, and deliberately not filed as one: Spacewalk listens for
-         * `DidHideCrosshairs` and may rely on it arriving for any key release,
-         * shown or not. Change this only with Spacewalk in view.
+         * ADR-0020 decision 5: drawing the guides and notifying the host are
+         * separate steps, so an echo can be drawn without the host hearing it.
          */
-        it('posts DidHideCrosshairs on any document keyup, even when crosshairs were never shown', () => {
+        it('draws the guides at a pixel without calling the host\'s handler', () => {
+            const handler = vi.fn()
+            browser.setCustomCrosshairsHandler(handler)
+
+            browser.drawCrosshairs({x: 40, y: 60})
+
+            expect(browser.contactMatrixView.xGuideElement.style.top).toBe('60px')
+            expect(browser.contactMatrixView.yGuideElement.style.left).toBe('40px')
+            expect(browser.layoutController.xTrackGuideElement.style.top).toBe('60px')
+            expect(browser.layoutController.yTrackGuideElement.style.left).toBe('40px')
+            expect(handler).not.toHaveBeenCalled()
+        })
+
+        it('draws the guides at the pointer on a mouse-move once shift is held', () => {
+            mouse(viewport, 'mouseover')
+            key('keydown', {key: 'Shift', shiftKey: true})
+            mouse(viewport, 'mousemove', {x: 40, y: 60})
+
+            expect(browser.contactMatrixView.xGuideElement.style.top).toBe('60px')
+            expect(browser.contactMatrixView.yGuideElement.style.left).toBe('40px')
+            expect(browser.contactMatrixView.xGuideElement.style.display).toBe('block')
+        })
+
+        /**
+         * The pointer's current panel owns the crosshairs (ADR-0020 decision
+         * 4): no keydown is needed to take them, and leaving gives them up.
+         * #707.
+         */
+        it('shows the guides at the pointer on entering the viewport with shift already held', () => {
+            const posted = watchPosts(browser, ['DidShowCrosshairs'])
+
+            mouse(viewport, 'mouseover', {x: 40, y: 60, shiftKey: true})
+
+            expect(posted).toEqual(['DidShowCrosshairs'])
+            expect(browser.contactMatrixView.xGuideElement.style.top).toBe('60px')
+            expect(browser.contactMatrixView.yGuideElement.style.left).toBe('40px')
+            expect(browser.contactMatrixView.xGuideElement.style.display).toBe('block')
+        })
+
+        it('hides the guides and posts DidHideCrosshairs when the pointer leaves with shift held', () => {
+            const handler = vi.fn()
+            const posted = watchPosts(browser, ['DidHideCrosshairs'])
+
+            mouse(viewport, 'mouseover', {x: 40, y: 60, shiftKey: true})
+            mouse(viewport, 'mouseleave', {x: 900, y: 60, shiftKey: true})
+            browser.setCustomCrosshairsHandler(handler)
+            mouse(viewport, 'mousemove', {x: 40, y: 30})
+
+            expect(posted).toEqual(['DidHideCrosshairs'])
+            expect(browser.contactMatrixView.xGuideElement.style.display).toBe('none')
+            expect(handler).not.toHaveBeenCalled()
+        })
+
+        it('resolves a pixel to its locus, and places that locus back on the pixel', () => {
+            // 500 bp per pixel, axes starting at 100 kb and 200 kb.
+            const locus = browser.crosshairsLocus({x: 40, y: 60})
+
+            expect(locus).toEqual({chr1: 'chr1', xBP: 120000, chr2: 'chr2', yBP: 230000})
+            expect(browser.placeCrosshairsLocus(locus)).toEqual({x: 40, y: 60})
+        })
+
+        it('reports a locus outside the 800 x 600 viewport as off-screen on that axis', () => {
+            // x ends at 500 kb; 600 kb is past it.
+            expect(browser.placeCrosshairsLocus({chr1: 'chr1', xBP: 600000, chr2: 'chr2', yBP: 230000}))
+                .toEqual({x: null, y: 60})
+        })
+
+        /**
+         * Source-only since #709 (ADR-0020 decision 6). Until then it was
+         * posted for any key release, shown or not, by every panel on the
+         * page -- which a host with several panels heard once per panel.
+         */
+        it('posts no DidHideCrosshairs on a document keyup when this panel was showing no crosshairs', () => {
             const posted = watchPosts(browser, ['DidHideCrosshairs'])
 
             key('keyup', {key: 'a'})
+            mouse(viewport, 'mouseover')
+            key('keydown', {key: 'Shift', shiftKey: true})
+            key('keyup', {key: 'Shift'})
 
-            expect(posted).toEqual(['DidHideCrosshairs'])
+            expect(posted).toEqual([])
         })
     })
 

@@ -118,6 +118,13 @@ export const NAMESPACE_SURFACE = [
  * `loadTracks` without its own, and to be reached only from the target-set fan-out.
  * Absence from this file is not permission, and naming them here is what makes
  * that decision visible.
+ *
+ * Nor, new in #708, `moveCrosshairs`, `releaseCrosshairs` and `echoCrosshairs`:
+ * the first two are how the viewport carries out a crosshairs intent, and the
+ * third is what a source calls on its sync-group peers. A host places nothing;
+ * it hears where the source's pointer is (ADR-0020 decision 5) -- since #709
+ * through `onCrosshairsMove`, which replaced the browser's short-lived
+ * `notifyCrosshairsHost` before that name was ever released.
  */
 export const BROWSER_SURFACE = [
     // Delegating loaders and lookups -- no internal callers, hosts only
@@ -129,6 +136,7 @@ export const BROWSER_SURFACE = [
 
     // Real methods
     'reset',
+    // Deprecated in #709 -- see DEPRECATED_SURFACE.
     'setCustomCrosshairsHandler',
     // The one teardown path, new in #493. Declared deliberately rather than
     // left to be discovered: Spacewalk tears down its Juicebox panel and has no
@@ -339,7 +347,8 @@ export const SUB_SURFACES = [
     // point: a hand-measured table missed it, and a test would not have.
     {owner: 'contactMatrixView', member: 'viewportElement'},
     {owner: 'coordinator', member: 'addCallback'},
-    // Spacewalk subscribes DidHideCrosshairs on the per-browser bus. Nothing in
+    // Spacewalk subscribes DidHideCrosshairs on the per-browser bus -- an event
+    // deprecated in #709, though the bus itself is not. Nothing in
     // this repo subscribes to either bus any more -- the coordinator is the
     // internal route -- so these three are read only from outside. unsubscribe
     // is new in #414: a host holding a handler on a browser it later discards
@@ -356,8 +365,8 @@ export const SUB_SURFACES = [
  * locus changes and colour changes without subscribing to the event bus. See
  * ADR-0002 for why the coordinator is not going away.
  *
- * All are declared, not just the ones a known consumer happens to use today:
- * `addCallback` throws on an unrecognised name, so the set it accepts is
+ * All of them are declared, not just the ones a known consumer happens to use
+ * today: `addCallback` throws on an unrecognised name, so the set it accepts is
  * already published behaviour. Narrowing it would break a host that registered
  * one of the others, silently and only at runtime.
  *
@@ -388,7 +397,14 @@ export const COORDINATOR_CALLBACKS = [
     'onColorScaleChange',
     'onNormalizationChange',
     'onNormalizationSubstituted',
-    'onDisplayModeChange'
+    'onDisplayModeChange',
+    // The crosshairs, new in #709: where the source's pointer is, and that it
+    // has gone. Once per pointer move, from the source only, never from an
+    // echo -- and again when the view changes under a still pointer. There is
+    // no "show": the first move after a hide is it. Silent in the whole-genome
+    // view, where the guides still draw. ADR-0020 decision 5.
+    'onCrosshairsMove',
+    'onCrosshairsHide'
 ]
 
 /**
@@ -461,7 +477,39 @@ export const COORDINATOR_PAYLOAD_SHAPES = [
         callback: 'onDisplayModeChange',
         payload: ['mode', 'browser'],
         values: {mode: ['A', 'B', 'AOB', 'BOA', 'AMB']}
+    },
+    // `chr1` and `chr2` are chromosome *names*, and never `All`: the host is not
+    // told in the whole-genome view. `extents` is the visible bp on each axis,
+    // along those two chromosomes, which is what replaces the old handler's viewport-fraction
+    // interpolants. `onCrosshairsHide` is called with nothing. Delivery is
+    // driven in `test/testCrosshairsHostCallbacks.js`.
+    {
+        callback: 'onCrosshairsMove',
+        payload: ['chr1', 'xBP', 'chr2', 'yBP', 'extents'],
+        readsInto: ['extents.startXBP', 'extents.endXBP', 'extents.startYBP', 'extents.endYBP']
     }
+]
+
+/**
+ * Declared surface that is on its way out.
+ *
+ * A deprecated name is still a promise: it stays in the list it was declared
+ * in, keeps working, and is removed only in the release named here. This list
+ * is what stops a deprecation quietly becoming a deletion -- the test checks
+ * each entry is still declared where `declaredIn` says, and that what replaces
+ * it is declared too.
+ *
+ * All three are the old crosshairs surface, and since #709 shims over the two
+ * coordinator callbacks: each fires where its replacement does, so each is
+ * source-only. That narrowed two of them. `DidHideCrosshairs` used to be posted
+ * by every panel on the page for any key release, shown or not; and
+ * `DidShowCrosshairs` used to be posted when Shift went down, before there was
+ * a position to show. ADR-0020 decision 6.
+ */
+export const DEPRECATED_SURFACE = [
+    {name: 'setCustomCrosshairsHandler', declaredIn: 'BROWSER_SURFACE', replacedBy: 'onCrosshairsMove', removeIn: '5.0'},
+    {name: 'DidShowCrosshairs', declaredIn: 'EVENTS_POSTED', replacedBy: 'onCrosshairsMove', removeIn: '5.0'},
+    {name: 'DidHideCrosshairs', declaredIn: 'EVENTS_POSTED', replacedBy: 'onCrosshairsHide', removeIn: '5.0'}
 ]
 
 /**
@@ -497,6 +545,7 @@ export const EVENTS_POSTED = [
     {name: 'Track2DLoad', bus: 'global'},
     {name: 'Track2DRemoval', bus: 'global'},
     {name: 'Track2DChange', bus: 'global'},
+    // Both deprecated in #709 -- see DEPRECATED_SURFACE.
     {name: 'DidHideCrosshairs', bus: 'browser'},
     {name: 'DidShowCrosshairs', bus: 'browser'},
     {name: 'DragStopped', bus: 'browser'}
