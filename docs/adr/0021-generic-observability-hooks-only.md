@@ -1,4 +1,4 @@
-# ADR-0020 — Generic observability hooks only; no host vocabulary
+# ADR-0021 — Generic observability hooks only; no host vocabulary
 
 **Status:** Accepted — shipped in v4.6.0.
 
