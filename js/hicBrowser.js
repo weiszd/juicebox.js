@@ -43,7 +43,6 @@ import {isSynchable, canResolveSyncState} from "./syncGroup.js"
 import {SENTINEL_ZOOM} from "./sentinelZoom.js"
 import {substitutionReason} from "./normalizationWidget.js"
 import {locusAtPixel, placeLocus} from "./crosshairsLocus.js"
-import HICEvent from "./hicEvent.js"
 
 const DEFAULT_PIXEL_SIZE = 1
 const MAX_PIXEL_SIZE = 128
