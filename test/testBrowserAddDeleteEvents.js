@@ -60,6 +60,66 @@ describe('BrowserAdd and BrowserDelete', () => {
         expect(registry.browsers).toEqual([first])
     })
 
+    it('delete still tears the browser down when a listener throws', () => {
+        // Codex adversarial review: the post used to sit unguarded in front of
+        // dispose(), so one failing host left the panel, its handlers and its
+        // sync membership alive after earlier listeners had been told it was gone.
+        const registry = registryForContainer(dom.container)
+        const first = new HICBrowser(dom.container, {})
+        const second = new HICBrowser(dom.container, {})
+        registry.add(first)
+        registry.add(second)
+        const failure = new Error('host bug')
+        const failing = () => { throw failure }
+        EventBus.globalBus.subscribe('BrowserDelete', failing)
+        listening()
+
+        try {
+            expect(() => registry.delete(second)).toThrow(failure)
+        } finally {
+            EventBus.globalBus.unsubscribe('BrowserDelete', failing)
+        }
+
+        expect(heard.map(({name, browser}) => [name, browser])).toEqual([['BrowserDelete', second]])
+        expect(registry.browsers).toEqual([first])
+        expect(second.rootElement.isConnected).toBe(false)
+    })
+
+    it('a second delete of the same browser posts nothing', () => {
+        const registry = registryForContainer(dom.container)
+        const first = new HICBrowser(dom.container, {})
+        const second = new HICBrowser(dom.container, {})
+        registry.add(first)
+        registry.add(second)
+        registry.delete(second)
+        listening()
+
+        registry.delete(second)
+
+        expect(heard).toEqual([])
+        expect(registry.browsers).toEqual([first])
+    })
+
+    it('a listener deleting the browser it is told about posts once', () => {
+        const registry = registryForContainer(dom.container)
+        const first = new HICBrowser(dom.container, {})
+        const second = new HICBrowser(dom.container, {})
+        registry.add(first)
+        registry.add(second)
+        const reentrant = ({data}) => registry.delete(data)
+        EventBus.globalBus.subscribe('BrowserDelete', reentrant)
+        listening()
+
+        try {
+            registry.delete(second)
+        } finally {
+            EventBus.globalBus.unsubscribe('BrowserDelete', reentrant)
+        }
+
+        expect(heard).toEqual([{name: 'BrowserDelete', browser: second, position: 1}])
+        expect(registry.browsers).toEqual([first])
+    })
+
     it('a reset posts neither', () => {
         const registry = registryForContainer(dom.container)
         const browser = new HICBrowser(dom.container, {})

@@ -63,6 +63,12 @@ class BrowserRegistry {
     #announceBefore = []
 
     /**
+     * Browsers whose `BrowserDelete` is being posted, so a listener that
+     * deletes the browser it is told about does not announce it twice.
+     */
+    #deleting = new Set()
+
+    /**
      * @param {Element} [container] - the host element this registry owns.
      *   Absent only in tests that exercise the registry without a document.
      */
@@ -489,12 +495,26 @@ class BrowserRegistry {
      * `rootElement` now cannot.
      */
     delete(browser) {
+
+        // Already gone (a second close) or being announced right now (a
+        // listener closing what it was told about): either way, once is enough.
+        if (!this.browsers.includes(browser) || this.#deleting.has(browser)) {
+            return
+        }
+
         // Posted while the browser is still in the list, so a host can read
         // the position it is leaving. `deleteAll` (a restore) and `reset()`
         // release their slots without passing here, so neither looks like the
-        // user closing a panel.
-        EventBus.globalBus.post(HICEvent("BrowserDelete", browser))
-        browser.dispose()
+        // user closing a panel. The teardown is in `finally` because a host's
+        // listener can throw, and its bug must not keep a browser alive that
+        // other listeners have already been told is gone.
+        this.#deleting.add(browser)
+        try {
+            EventBus.globalBus.post(HICEvent("BrowserDelete", browser))
+        } finally {
+            this.#deleting.delete(browser)
+            browser.dispose()
+        }
     }
 
     deleteAll() {
